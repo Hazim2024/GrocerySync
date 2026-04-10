@@ -202,6 +202,27 @@
       gap: 20px;
       align-items: flex-end;
       justify-content: center;
+      position: relative;
+    }
+
+    /* Desktop: phone-track is transparent — phones are direct flex children of .phones */
+    .phone-track {
+      display: contents;
+    }
+
+    /* Desktop: slide wrapper is also transparent */
+    .phone-slide {
+      display: contents;
+    }
+
+    /* Arrow buttons — hidden on desktop */
+    .carousel-arrow-btn {
+      display: none;
+    }
+
+    /* Dots — hidden on desktop */
+    .carousel-dots {
+      display: none;
     }
 
     .phone {
@@ -359,72 +380,105 @@
 
     /* ── Responsive ── */
     @media (max-width: 640px) {
-      .phone-side { display: none; }
-      .phone-main { width: 200px; height: 400px; }
       .glass-card { padding: 1.5rem; border-radius: 20px; }
 
-      /* Mobile carousel arrows */
-      .carousel-arrows {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        position: absolute;
-        top: 50%;
-        left: 0;
-        right: 0;
-        transform: translateY(-50%);
-        pointer-events: none;
-        z-index: 10;
+      /* Carousel container */
+      .phones {
+        overflow: hidden;
+        display: block;
+        width: 100%;
       }
 
-      .carousel-arrow {
-        width: 40px;
-        height: 40px;
-        border-radius: 50%;
-        background: rgba(59, 130, 246, 0.1);
-        border: 1px solid rgba(59, 130, 246, 0.3);
-        color: #3B82F6;
+      /* Sliding track — holds all 3 phones side by side */
+      .phone-track {
         display: flex;
+        transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+        will-change: transform;
+      }
+
+      /* Each slide takes the full container width */
+      .phone-slide {
+        display: flex;
+        flex: 0 0 100%;
+        justify-content: center;
+        align-items: center;
+        padding: 16px 0 8px;
+      }
+
+      /* Show all phones in carousel (side phones visible again) */
+      .phone-track .phone-side {
+        display: flex;
+        opacity: 1;
+        transform: none;
+        width: 200px;
+        height: 400px;
+      }
+
+      .phone-track .phone-main {
+        width: 200px;
+        height: 400px;
+      }
+
+      /* Arrow buttons */
+      .carousel-arrow-btn {
+        display: flex;
+        position: absolute;
+        top: 50%;
+        transform: translateY(-50%);
+        z-index: 20;
+        width: 38px;
+        height: 38px;
+        border-radius: 50%;
+        border: 1px solid rgba(59, 130, 246, 0.4);
+        background: rgba(5, 5, 8, 0.75);
+        color: #93C5FD;
         align-items: center;
         justify-content: center;
         cursor: pointer;
-        pointer-events: auto;
-        transition: all 0.2s ease;
         backdrop-filter: blur(10px);
         -webkit-backdrop-filter: blur(10px);
+        transition: background 0.2s, border-color 0.2s;
+        padding: 0;
       }
 
-      .carousel-arrow:hover {
-        background: rgba(59, 130, 246, 0.2);
-        border-color: rgba(59, 130, 246, 0.5);
-        transform: scale(1.05);
+      .carousel-arrow-btn:hover {
+        background: rgba(59, 130, 246, 0.18);
+        border-color: rgba(59, 130, 246, 0.65);
       }
 
-      .carousel-arrow:active {
-        transform: scale(0.95);
+      .carousel-arrow-btn:active {
+        transform: translateY(-50%) scale(0.91);
       }
 
-      .carousel-arrow svg {
-        width: 16px;
-        height: 16px;
+      .carousel-arrow-btn.prev { left: 6px; }
+      .carousel-arrow-btn.next { right: 6px; }
+
+      .carousel-arrow-btn:disabled {
+        opacity: 0.2;
+        cursor: default;
+        pointer-events: none;
       }
 
-      /* Mobile carousel container */
-      .phones {
-        position: relative;
-        overflow: hidden;
-      }
-
-      .phone-carousel {
-        display: flex;
-        transition: transform 0.3s ease;
-        width: 300%;
-      }
-
-      .phone-carousel-item {
-        flex: 0 0 33.333%;
+      /* Dot indicators */
+      .carousel-dots {
         display: flex;
         justify-content: center;
+        align-items: center;
+        gap: 6px;
+        margin-top: 14px;
+      }
+
+      .carousel-dot {
+        height: 6px;
+        width: 6px;
+        border-radius: 100px;
+        background: rgba(255, 255, 255, 0.2);
+        transition: width 0.25s ease, background 0.25s ease;
+      }
+
+      .carousel-dot.active {
+        width: 18px;
+        background: #3B82F6;
       }
     }
   </style>
@@ -467,44 +521,96 @@
 
     <!-- Phone mockup card -->
     <div class="glass-card">
-      <div class="phones">
-        <!-- Mobile carousel arrows -->
-        <div class="carousel-arrows">
-          <button class="carousel-arrow" id="prev-arrow">
-            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M15 18L9 12L15 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
-          </button>
-          <button class="carousel-arrow" id="next-arrow">
-            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M9 18L15 12L9 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
-          </button>
-        </div>
+      <div class="phones" id="phoneCarousel">
 
-        <div class="phone-carousel" id="phone-carousel">
-          <div class="phone-carousel-item">
-            <!-- Left phone (side) -->
+        <!-- Prev arrow (mobile only) -->
+        <button class="carousel-arrow-btn prev" id="carouselPrev" aria-label="Previous screen" disabled>
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+            <path d="M10 12L6 8L10 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </button>
+
+        <!-- Sliding phone track -->
+        <div class="phone-track" id="phoneTrack">
+
+          <!-- Slide 1 — Left screen -->
+          <div class="phone-slide">
             <div class="phone phone-side">
               <img src="images/screen1.png" alt="App screenshot" />
+              <div class="phone-inner">
+                <div class="ui-circle"></div>
+                <div class="ui-bars">
+                  <div class="ui-bar accent"></div>
+                  <div class="ui-bar short"></div>
+                  <div class="ui-bar"></div>
+                  <div class="ui-bar shorter"></div>
+                  <div class="ui-bar"></div>
+                  <div class="ui-bar short accent"></div>
+                </div>
+                <p class="phone-placeholder-label">screenshot</p>
+              </div>
             </div>
           </div>
 
-          <div class="phone-carousel-item">
-            <!-- Centre phone (main) -->
+          <!-- Slide 2 — Centre screen (default) -->
+          <div class="phone-slide">
             <div class="phone phone-main">
               <img src="images/screen2.png" alt="App screenshot" />
+              <div class="phone-inner">
+                <div class="ui-circle" style="width:56px;height:56px;"></div>
+                <div class="ui-bars">
+                  <div class="ui-bar accent"></div>
+                  <div class="ui-bar"></div>
+                  <div class="ui-bar short"></div>
+                  <div class="ui-bar"></div>
+                  <div class="ui-bar accent shorter"></div>
+                  <div class="ui-bar"></div>
+                  <div class="ui-bar short"></div>
+                  <div class="ui-bar"></div>
+                  <div class="ui-bar shorter"></div>
+                </div>
+                <p class="phone-placeholder-label">screenshot</p>
+              </div>
             </div>
           </div>
 
-          <div class="phone-carousel-item">
-            <!-- Right phone (side) -->
+          <!-- Slide 3 — Right screen -->
+          <div class="phone-slide">
             <div class="phone phone-side right">
               <img src="images/screen3.png" alt="App screenshot" />
+              <div class="phone-inner">
+                <div class="ui-circle"></div>
+                <div class="ui-bars">
+                  <div class="ui-bar short accent"></div>
+                  <div class="ui-bar"></div>
+                  <div class="ui-bar shorter"></div>
+                  <div class="ui-bar accent"></div>
+                  <div class="ui-bar short"></div>
+                  <div class="ui-bar"></div>
+                </div>
+                <p class="phone-placeholder-label">screenshot</p>
+              </div>
             </div>
           </div>
-        </div>
+
+        </div><!-- /phone-track -->
+
+        <!-- Next arrow (mobile only) -->
+        <button class="carousel-arrow-btn next" id="carouselNext" aria-label="Next screen">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+            <path d="M6 4L10 8L6 12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </button>
+
+      </div><!-- /phones -->
+
+      <!-- Dot indicators (mobile only) -->
+      <div class="carousel-dots" id="carouselDots">
+        <div class="carousel-dot"></div>
+        <div class="carousel-dot active"></div>
+        <div class="carousel-dot"></div>
       </div>
+
       <p class="card-caption">App preview — screenshots coming soon</p>
     </div>
 
@@ -520,35 +626,45 @@
   </div>
 
   <script>
-    // Mobile carousel functionality
-    document.addEventListener('DOMContentLoaded', function() {
-      const carousel = document.getElementById('phone-carousel');
-      const prevArrow = document.getElementById('prev-arrow');
-      const nextArrow = document.getElementById('next-arrow');
-      let currentIndex = 1; // Start with middle slide (screen2.png)
+    (function () {
+      var TOTAL = 3;
+      var current = 1; // start on centre phone
 
-      function updateCarousel() {
-        const translateX = -currentIndex * (100 / 3);
-        carousel.style.transform = `translateX(${translateX}%)`;
+      var track = document.getElementById('phoneTrack');
+      var prevBtn = document.getElementById('carouselPrev');
+      var nextBtn = document.getElementById('carouselNext');
+      var dots = document.getElementById('carouselDots').children;
+
+      function goTo(index) {
+        current = index;
+        track.style.transform = 'translateX(-' + (current * 100) + '%)';
+
+        // Update dots
+        for (var i = 0; i < dots.length; i++) {
+          dots[i].classList.toggle('active', i === current);
+        }
+
+        // Update button states
+        prevBtn.disabled = current === 0;
+        nextBtn.disabled = current === TOTAL - 1;
       }
 
-      function nextSlide() {
-        currentIndex = (currentIndex + 1) % 3;
-        updateCarousel();
-      }
+      prevBtn.addEventListener('click', function () {
+        if (current > 0) goTo(current - 1);
+      });
 
-      function prevSlide() {
-        currentIndex = (currentIndex - 1 + 3) % 3;
-        updateCarousel();
-      }
+      nextBtn.addEventListener('click', function () {
+        if (current < TOTAL - 1) goTo(current + 1);
+      });
 
-      // Add event listeners
-      nextArrow.addEventListener('click', nextSlide);
-      prevArrow.addEventListener('click', prevSlide);
-
-      // Initialize carousel position
-      updateCarousel();
-    });
+      // Initialise position (no animation on first load)
+      track.style.transition = 'none';
+      goTo(1);
+      // Re-enable transition after a frame
+      requestAnimationFrame(function () {
+        track.style.transition = '';
+      });
+    })();
   </script>
 
 </body>
