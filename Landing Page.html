@@ -1,0 +1,779 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>GrocerySync — Shared Grocery Spending, Simplified</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Inter:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,300&display=swap" rel="stylesheet" />
+<style>
+  *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --bg:      #05060a;
+    --surface: rgba(13,16,26,0.7);
+    --blue:    #3B82F6;
+    --cyan:    #00B8D4;
+    --green:   #10b981;
+    --white:   #eef2ff;
+    --dim:     #64748b;
+    --muted:   #334155;
+    --border:  rgba(255,255,255,0.06);
+    --mono:    'JetBrains Mono', monospace;
+    --sans:    'Inter', sans-serif;
+  }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    background: var(--bg);
+    color: var(--white);
+    font-family: var(--sans);
+    overflow-x: hidden;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ── Background ── */
+  .bg-canvas {
+    position: fixed; inset: 0; z-index: 0; overflow: hidden; pointer-events: none;
+  }
+  .orb {
+    position: absolute; border-radius: 50%; filter: blur(120px); opacity: 0.18;
+    animation: drift 18s ease-in-out infinite alternate;
+  }
+  .orb-1 { width: 600px; height: 600px; background: var(--blue);   top: -200px; left: -150px; animation-delay: 0s; }
+  .orb-2 { width: 500px; height: 500px; background: var(--cyan);   top: 40%;   right: -180px; animation-delay: -6s; }
+  .orb-3 { width: 400px; height: 400px; background: var(--green);  bottom: -100px; left: 30%; animation-delay: -12s; opacity: 0.1; }
+
+  @keyframes drift {
+    0%   { transform: translate(0, 0) scale(1); }
+    100% { transform: translate(40px, 30px) scale(1.08); }
+  }
+
+  /* ── Noise grain overlay ── */
+  body::before {
+    content: '';
+    position: fixed; inset: 0; z-index: 1; pointer-events: none;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E");
+    opacity: 0.025;
+  }
+
+  /* ── Layout ── */
+  .wrap { position: relative; z-index: 2; max-width: 1100px; margin: 0 auto; padding: 0 24px; }
+
+  /* ── Nav ── */
+  nav {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+    padding: 16px 0;
+    background: rgba(5,6,10,0.6);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-bottom: 1px solid var(--border);
+    transition: background 0.3s;
+  }
+  .nav-inner {
+    max-width: 1100px; margin: 0 auto; padding: 0 24px;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .nav-logo {
+    display: flex; align-items: center; gap: 10px;
+    font-family: var(--mono); font-size: 15px; font-weight: 600; color: var(--white);
+    text-decoration: none; letter-spacing: -0.01em;
+  }
+  .nav-logo-dot {
+    width: 28px; height: 28px; position: relative; flex-shrink: 0;
+  }
+  .nav-logo-dot svg { width: 28px; height: 28px; }
+  .nav-cta {
+    display: flex; align-items: center; gap: 8px;
+    padding: 9px 20px; border-radius: 50px;
+    background: rgba(59,130,246,0.12);
+    border: 1px solid rgba(59,130,246,0.3);
+    color: var(--blue); font-size: 13px; font-weight: 600;
+    text-decoration: none; transition: all 0.2s ease;
+    font-family: var(--sans);
+  }
+  .nav-cta:hover { background: rgba(59,130,246,0.2); border-color: rgba(59,130,246,0.5); }
+
+  /* ── Hero ── */
+  .hero {
+    min-height: 100svh;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    text-align: center;
+    padding: 120px 24px 80px;
+  }
+  .hero-badge {
+    display: inline-flex; align-items: center; gap: 8px;
+    font-family: var(--mono); font-size: 11px; font-weight: 500;
+    color: var(--blue); letter-spacing: 0.15em; text-transform: uppercase;
+    background: rgba(59,130,246,0.08);
+    border: 1px solid rgba(59,130,246,0.2);
+    padding: 7px 16px; border-radius: 50px;
+    margin-bottom: 36px;
+    opacity: 0; animation: fade-up 0.7s ease 0.1s forwards;
+  }
+  .hero-badge-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--blue); animation: pulse-dot 2s ease infinite; }
+  @keyframes pulse-dot {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.5; transform: scale(0.7); }
+  }
+
+  .hero-title {
+    font-size: clamp(52px, 8vw, 96px);
+    font-weight: 800; line-height: 1.0; letter-spacing: -0.04em;
+    margin-bottom: 24px;
+    opacity: 0; animation: fade-up 0.8s ease 0.25s forwards;
+  }
+  .hero-title span {
+    background: linear-gradient(135deg, var(--white) 30%, rgba(59,130,246,0.7));
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+  }
+  .hero-title .accent {
+    background: linear-gradient(135deg, var(--blue), var(--cyan));
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+  }
+
+  .hero-sub {
+    max-width: 520px;
+    font-size: 18px; font-weight: 300; line-height: 1.6;
+    color: rgba(238,242,255,0.55);
+    margin-bottom: 44px;
+    opacity: 0; animation: fade-up 0.8s ease 0.4s forwards;
+  }
+
+  .hero-actions {
+    display: flex; gap: 14px; align-items: center; justify-content: center; flex-wrap: wrap;
+    opacity: 0; animation: fade-up 0.8s ease 0.55s forwards;
+  }
+  .btn-primary {
+    display: flex; align-items: center; gap: 10px;
+    padding: 16px 32px; border-radius: 50px;
+    background: linear-gradient(135deg, var(--blue), var(--cyan));
+    color: #fff; font-size: 15px; font-weight: 700;
+    text-decoration: none; letter-spacing: 0.01em;
+    box-shadow: 0 8px 32px rgba(59,130,246,0.35);
+    transition: all 0.25s ease;
+    position: relative; overflow: hidden;
+  }
+  .btn-primary::after {
+    content: '';
+    position: absolute; inset: 0;
+    background: linear-gradient(135deg, rgba(255,255,255,0.15), transparent);
+    opacity: 0; transition: opacity 0.25s;
+  }
+  .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 12px 40px rgba(59,130,246,0.45); }
+  .btn-primary:hover::after { opacity: 1; }
+  .btn-primary:active { transform: translateY(0); }
+
+  .btn-ghost {
+    display: flex; align-items: center; gap: 8px;
+    padding: 16px 28px; border-radius: 50px;
+    border: 1px solid var(--border);
+    color: rgba(238,242,255,0.6); font-size: 15px; font-weight: 500;
+    text-decoration: none; transition: all 0.2s ease;
+  }
+  .btn-ghost:hover { border-color: rgba(255,255,255,0.15); color: var(--white); }
+
+  .hero-meta {
+    margin-top: 60px;
+    display: flex; align-items: center; gap: 32px; justify-content: center; flex-wrap: wrap;
+    opacity: 0; animation: fade-up 0.8s ease 0.7s forwards;
+  }
+  .hero-meta-item {
+    display: flex; align-items: center; gap: 8px;
+    font-family: var(--mono); font-size: 11px; color: var(--dim); letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  .hero-meta-item svg { opacity: 0.5; }
+
+  /* ── Phone mockup ── */
+  .phone-wrap {
+    margin-top: 80px;
+    display: flex; justify-content: center;
+    opacity: 0; animation: fade-up 0.9s ease 0.6s forwards;
+  }
+  .phone {
+    width: 260px; height: 520px;
+    background: rgba(13,16,23,0.85);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 44px;
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    padding: 16px;
+    position: relative;
+    box-shadow:
+      0 0 0 1px rgba(255,255,255,0.04) inset,
+      0 40px 80px rgba(0,0,0,0.6),
+      0 0 80px rgba(59,130,246,0.08);
+    overflow: hidden;
+  }
+  .phone-notch {
+    width: 80px; height: 22px;
+    background: #000;
+    border-radius: 0 0 16px 16px;
+    margin: 0 auto 14px;
+  }
+  .phone-screen { padding: 0 4px; }
+  .phone-header {
+    display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;
+  }
+  .phone-spend { font-family: var(--mono); }
+  .phone-spend-label { font-size: 7px; color: var(--dim); letter-spacing: 0.15em; text-transform: uppercase; }
+  .phone-spend-amount { font-size: 18px; font-weight: 700; color: var(--white); }
+  .phone-avatar {
+    width: 28px; height: 28px; border-radius: 50%;
+    border: 2px solid var(--green);
+    display: flex; align-items: center; justify-content: center;
+    font-family: var(--mono); font-size: 11px; font-weight: 700; color: var(--green);
+    background: rgba(13,16,23,0.9);
+  }
+  .phone-budget {
+    background: rgba(255,255,255,0.04); border-radius: 8px; padding: 8px 10px; margin-bottom: 12px;
+  }
+  .phone-budget-row { display: flex; justify-content: space-between; margin-bottom: 5px; }
+  .phone-budget-label { font-family: var(--mono); font-size: 7px; color: var(--dim); letter-spacing: 0.12em; text-transform: uppercase; }
+  .phone-budget-val { font-family: var(--mono); font-size: 8px; color: var(--blue); }
+  .phone-bar { height: 3px; background: rgba(255,255,255,0.05); border-radius: 99px; overflow: hidden; }
+  .phone-bar-fill { height: 100%; width: 16%; background: linear-gradient(90deg, var(--blue), var(--cyan)); border-radius: 99px; }
+
+  .phone-section-label {
+    font-family: var(--mono); font-size: 7px; color: var(--dim);
+    letter-spacing: 0.15em; text-transform: uppercase; margin-bottom: 7px;
+  }
+  .phone-shops {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; margin-bottom: 12px;
+  }
+  .phone-shop {
+    background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 9px; padding: 7px 4px;
+    text-align: center; font-size: 9px; font-weight: 600; color: rgba(238,242,255,0.6);
+  }
+  .phone-shop.active {
+    background: rgba(59,130,246,0.1); border-color: rgba(59,130,246,0.35);
+    color: var(--blue);
+  }
+  .phone-amount {
+    background: rgba(255,255,255,0.04); border-radius: 10px; padding: 10px;
+    display: flex; align-items: baseline; justify-content: center; gap: 4px; margin-bottom: 12px;
+  }
+  .phone-amount-sym { font-family: var(--mono); font-size: 14px; color: var(--dim); }
+  .phone-amount-val { font-family: var(--mono); font-size: 26px; font-weight: 700; color: var(--white); }
+  .phone-chips { display: flex; gap: 5px; margin-bottom: 12px; }
+  .phone-chip {
+    padding: 5px 10px; border-radius: 99px; font-size: 9px; font-weight: 500;
+    background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.06);
+    color: rgba(238,242,255,0.5);
+  }
+  .phone-chip.active { background: rgba(59,130,246,0.12); border-color: rgba(59,130,246,0.35); color: var(--blue); }
+  .phone-save {
+    width: 100%; padding: 12px;
+    border-radius: 99px; border: none;
+    background: linear-gradient(135deg, var(--blue), var(--cyan));
+    color: #fff; font-size: 10px; font-weight: 700; letter-spacing: 0.1em;
+    text-transform: uppercase; font-family: var(--mono);
+    display: flex; align-items: center; justify-content: center; gap: 6px;
+    box-shadow: 0 4px 16px rgba(59,130,246,0.3);
+  }
+
+  /* ── Section headings ── */
+  .section-eyebrow {
+    font-family: var(--mono); font-size: 10px; font-weight: 600;
+    color: var(--blue); letter-spacing: 0.2em; text-transform: uppercase;
+    margin-bottom: 14px;
+  }
+  .section-title {
+    font-size: clamp(32px, 4vw, 48px); font-weight: 800;
+    line-height: 1.1; letter-spacing: -0.03em;
+    margin-bottom: 14px;
+  }
+  .section-sub {
+    font-size: 16px; font-weight: 300; color: rgba(238,242,255,0.45); line-height: 1.6;
+    max-width: 460px;
+  }
+
+  /* ── Features ── */
+  .features { padding: 120px 0; }
+  .features-head { text-align: center; margin-bottom: 64px; }
+  .features-head .section-sub { margin: 0 auto; }
+
+  .features-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 16px;
+  }
+  .feature-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 24px;
+    padding: 32px;
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    position: relative; overflow: hidden;
+    transition: transform 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease;
+    opacity: 0; transform: translateY(24px);
+  }
+  .feature-card.visible { opacity: 1; transform: translateY(0); transition: opacity 0.55s ease, transform 0.55s ease, border-color 0.25s, box-shadow 0.25s; }
+  .feature-card::before {
+    content: '';
+    position: absolute; inset: 0;
+    background: radial-gradient(600px circle at var(--mx, 50%) var(--my, 50%), rgba(59,130,246,0.06), transparent 60%);
+    opacity: 0; transition: opacity 0.3s;
+  }
+  .feature-card:hover { border-color: rgba(255,255,255,0.1); box-shadow: 0 8px 40px rgba(0,0,0,0.3); }
+  .feature-card:hover::before { opacity: 1; }
+
+  .feature-icon {
+    width: 48px; height: 48px; border-radius: 14px;
+    display: flex; align-items: center; justify-content: center;
+    margin-bottom: 20px;
+    position: relative;
+  }
+  .feature-icon svg { width: 22px; height: 22px; }
+
+  .feature-title {
+    font-size: 18px; font-weight: 700; letter-spacing: -0.02em;
+    margin-bottom: 10px; color: var(--white);
+  }
+  .feature-desc {
+    font-size: 14px; font-weight: 400; line-height: 1.65;
+    color: rgba(238,242,255,0.45);
+  }
+
+  /* ── How it works ── */
+  .how { padding: 0 0 120px; }
+  .how-head { text-align: center; margin-bottom: 64px; }
+  .how-head .section-sub { margin: 0 auto; }
+
+  .steps {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 0; position: relative;
+  }
+  .steps::before {
+    content: '';
+    position: absolute; top: 28px; left: calc(16.6% + 28px); right: calc(16.6% + 28px);
+    height: 1px; background: linear-gradient(90deg, transparent, var(--muted), transparent);
+  }
+  .step {
+    display: flex; flex-direction: column; align-items: center; text-align: center;
+    padding: 0 24px;
+    opacity: 0; transform: translateY(20px);
+  }
+  .step.visible { opacity: 1; transform: translateY(0); transition: opacity 0.55s ease, transform 0.55s ease; }
+  .step-num {
+    width: 56px; height: 56px; border-radius: 50%;
+    background: rgba(59,130,246,0.08);
+    border: 1px solid rgba(59,130,246,0.25);
+    display: flex; align-items: center; justify-content: center;
+    font-family: var(--mono); font-size: 18px; font-weight: 700; color: var(--blue);
+    margin-bottom: 20px; position: relative; z-index: 1;
+  }
+  .step-title { font-size: 16px; font-weight: 700; margin-bottom: 10px; color: var(--white); }
+  .step-desc { font-size: 13px; line-height: 1.6; color: rgba(238,242,255,0.4); }
+
+  /* ── Stats band ── */
+  .stats {
+    padding: 64px 0;
+    border-top: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 120px;
+  }
+  .stats-grid {
+    display: flex; justify-content: space-around; flex-wrap: wrap; gap: 40px;
+  }
+  .stat-item { text-align: center; }
+  .stat-value {
+    font-family: var(--mono); font-size: 40px; font-weight: 700; letter-spacing: -0.04em;
+    background: linear-gradient(135deg, var(--blue), var(--cyan));
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+    line-height: 1;
+    margin-bottom: 8px;
+  }
+  .stat-label { font-size: 13px; color: var(--dim); font-weight: 400; }
+
+  /* ── CTA section ── */
+  .cta-section {
+    padding: 0 0 140px;
+    text-align: center;
+  }
+  .cta-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 32px;
+    padding: 80px 48px;
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    position: relative; overflow: hidden;
+    opacity: 0; transform: translateY(24px);
+  }
+  .cta-card.visible { opacity: 1; transform: translateY(0); transition: opacity 0.6s ease, transform 0.6s ease; }
+  .cta-card::before {
+    content: '';
+    position: absolute; top: -1px; left: 20%; right: 20%;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(59,130,246,0.6), transparent);
+  }
+  .cta-card::after {
+    content: '';
+    position: absolute; inset: 0;
+    background: radial-gradient(ellipse 60% 50% at 50% 0%, rgba(59,130,246,0.07), transparent 70%);
+    pointer-events: none;
+  }
+  .cta-title {
+    font-size: clamp(28px, 4vw, 44px); font-weight: 800; letter-spacing: -0.03em;
+    margin-bottom: 16px;
+  }
+  .cta-sub { font-size: 16px; color: rgba(238,242,255,0.45); margin-bottom: 40px; font-weight: 300; }
+
+  /* ── Footer ── */
+  footer {
+    padding: 32px 0;
+    border-top: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .footer-inner {
+    max-width: 1100px; width: 100%; margin: 0 auto; padding: 0 24px;
+    display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px;
+  }
+  .footer-copy { font-size: 13px; color: var(--dim); }
+  .footer-link { color: var(--dim); text-decoration: none; transition: color 0.2s; }
+  .footer-link:hover { color: var(--white); }
+
+  /* ── Animations ── */
+  @keyframes fade-up {
+    from { opacity: 0; transform: translateY(20px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  /* ── Responsive ── */
+  @media (max-width: 640px) {
+    .hero { padding: 100px 20px 60px; }
+    .phone { width: 220px; height: 440px; }
+    .phone-amount-val { font-size: 22px; }
+    .cta-card { padding: 48px 24px; }
+    .steps::before { display: none; }
+    .nav-cta { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<!-- Background orbs -->
+<div class="bg-canvas">
+  <div class="orb orb-1"></div>
+  <div class="orb orb-2"></div>
+  <div class="orb orb-3"></div>
+</div>
+
+<!-- Nav -->
+<nav>
+  <div class="nav-inner">
+    <a href="#" class="nav-logo">
+      <div class="nav-logo-dot">
+        <svg viewBox="0 0 28 28" fill="none">
+          <circle cx="14" cy="14" r="3.5" fill="#3B82F6"/>
+          <circle cx="14" cy="14" r="8"   stroke="#3B82F6" stroke-width="1.2" opacity="0.4"/>
+          <circle cx="14" cy="14" r="13"  stroke="#3B82F6" stroke-width="1"   opacity="0.15"/>
+        </svg>
+      </div>
+      GrocerySync
+    </a>
+    <a href="https://grocery-tracker-khaki.vercel.app/" target="_blank" rel="noopener" class="nav-cta">
+      Open App
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M7 17L17 7M7 7h10v10"/></svg>
+    </a>
+  </div>
+</nav>
+
+<!-- Hero -->
+<section class="hero">
+  <div class="wrap" style="display:flex;flex-direction:column;align-items:center;">
+
+    <div class="hero-badge">
+      <span class="hero-badge-dot"></span>
+      Household Spending Tracker
+    </div>
+
+    <h1 class="hero-title">
+      <span>Grocery spend,</span><br>
+      <span class="accent">finally organised.</span>
+    </h1>
+
+    <p class="hero-sub">
+      Log a shop trip in seconds. Share it with your household. Track your budget together — no spreadsheets, no friction.
+    </p>
+
+    <div class="hero-actions">
+      <a href="https://grocery-tracker-khaki.vercel.app/" target="_blank" rel="noopener" class="btn-primary">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><polyline points="12 8 16 12 12 16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+        Open GrocerySync
+      </a>
+      <a href="#features" class="btn-ghost">
+        See features
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="6 9 12 15 18 9"/></svg>
+      </a>
+    </div>
+
+    <div class="hero-meta">
+      <div class="hero-meta-item">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        Multi-member households
+      </div>
+      <div class="hero-meta-item">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+        Real-time sync
+      </div>
+      <div class="hero-meta-item">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
+        Free to use
+      </div>
+    </div>
+
+    <!-- Phone mockup -->
+    <div class="phone-wrap">
+      <div class="phone">
+        <div class="phone-notch"></div>
+        <div class="phone-screen">
+          <div class="phone-header">
+            <div class="phone-spend">
+              <div class="phone-spend-label">Family Spend</div>
+              <div class="phone-spend-amount">£80.85</div>
+            </div>
+            <div class="phone-avatar">K</div>
+          </div>
+
+          <div class="phone-budget">
+            <div class="phone-budget-row">
+              <span class="phone-budget-label">Monthly Budget</span>
+              <span class="phone-budget-val">£80.85 / £500</span>
+            </div>
+            <div class="phone-bar"><div class="phone-bar-fill"></div></div>
+          </div>
+
+          <div class="phone-section-label">Select Shop</div>
+          <div class="phone-shops">
+            <div class="phone-shop active">Lidl</div>
+            <div class="phone-shop">Asda</div>
+            <div class="phone-shop">Arab Shop</div>
+            <div class="phone-shop">Ethiopian</div>
+            <div class="phone-shop">Shoes</div>
+            <div class="phone-shop">JD Sports</div>
+          </div>
+
+          <div class="phone-section-label">Transaction Value</div>
+          <div class="phone-amount">
+            <span class="phone-amount-sym">£</span>
+            <span class="phone-amount-val">24.50</span>
+          </div>
+
+          <div class="phone-section-label">Category</div>
+          <div class="phone-chips">
+            <div class="phone-chip active">🍎 Grocery</div>
+            <div class="phone-chip">🥩 Meat</div>
+            <div class="phone-chip">🥦 Veg</div>
+          </div>
+
+          <button class="phone-save">
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+            Save Transaction
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Features -->
+<section class="features" id="features">
+  <div class="wrap">
+    <div class="features-head">
+      <div class="section-eyebrow">Features</div>
+      <h2 class="section-title">Everything your household needs</h2>
+      <p class="section-sub">Built around real grocery habits — fast to log, easy to share, clear to understand.</p>
+    </div>
+
+    <div class="features-grid">
+
+      <div class="feature-card" data-delay="0">
+        <div class="feature-icon" style="background:rgba(59,130,246,0.1);">
+          <svg viewBox="0 0 24 24" fill="none" stroke="#3B82F6" stroke-width="2" stroke-linecap="round">
+            <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
+          </svg>
+        </div>
+        <div class="feature-title">One-tap logging</div>
+        <div class="feature-desc">Pick a shop, enter the amount, hit save. The whole flow takes under 10 seconds — designed for the checkout queue.</div>
+      </div>
+
+      <div class="feature-card" data-delay="80">
+        <div class="feature-icon" style="background:rgba(0,184,212,0.1);">
+          <svg viewBox="0 0 24 24" fill="none" stroke="#00B8D4" stroke-width="2" stroke-linecap="round">
+            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>
+            <path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+          </svg>
+        </div>
+        <div class="feature-title">Household sharing</div>
+        <div class="feature-desc">Create a household and invite members with a 6-letter code. Everyone's transactions are pooled automatically.</div>
+      </div>
+
+      <div class="feature-card" data-delay="160">
+        <div class="feature-icon" style="background:rgba(16,185,129,0.1);">
+          <svg viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2" stroke-linecap="round">
+            <line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/>
+          </svg>
+        </div>
+        <div class="feature-title">Budget tracking</div>
+        <div class="feature-desc">Set a monthly household budget and watch it in real time. A visual progress bar keeps everyone honest.</div>
+      </div>
+
+      <div class="feature-card" data-delay="240">
+        <div class="feature-icon" style="background:rgba(167,139,250,0.1);">
+          <svg viewBox="0 0 24 24" fill="none" stroke="#a78bfa" stroke-width="2" stroke-linecap="round">
+            <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/>
+            <line x1="7" y1="7" x2="7.01" y2="7"/>
+          </svg>
+        </div>
+        <div class="feature-title">Spend categories</div>
+        <div class="feature-desc">Tag each transaction — Grocery, Meat, Health, Clothing. Add your own custom categories at any time.</div>
+      </div>
+
+      <div class="feature-card" data-delay="320">
+        <div class="feature-icon" style="background:rgba(251,191,36,0.1);">
+          <svg viewBox="0 0 24 24" fill="none" stroke="#fbbf24" stroke-width="2" stroke-linecap="round">
+            <polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/>
+            <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+          </svg>
+        </div>
+        <div class="feature-title">Real-time sync</div>
+        <div class="feature-desc">Powered by Supabase. The moment one member logs a shop, everyone else's totals update — no refresh needed.</div>
+      </div>
+
+      <div class="feature-card" data-delay="400">
+        <div class="feature-icon" style="background:rgba(239,68,68,0.08);">
+          <svg viewBox="0 0 24 24" fill="none" stroke="#f87171" stroke-width="2" stroke-linecap="round">
+            <circle cx="12" cy="12" r="10"/>
+            <polyline points="12 8 12 12 14 14"/>
+          </svg>
+        </div>
+        <div class="feature-title">Activity history</div>
+        <div class="feature-desc">Every transaction is timestamped and stored. Review your household's full spending history at any point.</div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- Stats -->
+<section class="stats">
+  <div class="wrap">
+    <div class="stats-grid">
+      <div class="stat-item">
+        <div class="stat-value">&lt;10s</div>
+        <div class="stat-label">to log a transaction</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-value">∞</div>
+        <div class="stat-label">household members</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-value">6</div>
+        <div class="stat-label">letter invite code</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-value">£0</div>
+        <div class="stat-label">to get started</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- How it works -->
+<section class="how" id="how">
+  <div class="wrap">
+    <div class="how-head">
+      <div class="section-eyebrow">How it works</div>
+      <h2 class="section-title">Up and running in minutes</h2>
+      <p class="section-sub">No complicated setup. Just sign up, create your household, and start logging.</p>
+    </div>
+
+    <div class="steps">
+      <div class="step" data-delay="0">
+        <div class="step-num">1</div>
+        <div class="step-title">Create an account</div>
+        <div class="step-desc">Sign up in seconds. Choose your initial and a colour — that's your household identity.</div>
+      </div>
+      <div class="step" data-delay="120">
+        <div class="step-num">2</div>
+        <div class="step-title">Set up your household</div>
+        <div class="step-desc">Create a household and share the 6-letter code with family members so they can join.</div>
+      </div>
+      <div class="step" data-delay="240">
+        <div class="step-num">3</div>
+        <div class="step-title">Log & track together</div>
+        <div class="step-desc">Every shop trip logged by anyone instantly appears in your shared activity and budget.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- CTA -->
+<section class="cta-section">
+  <div class="wrap">
+    <div class="cta-card">
+      <h2 class="cta-title">Ready to sync your grocery spend?</h2>
+      <p class="cta-sub">Free, fast, and built for real households.</p>
+      <a href="https://grocery-tracker-khaki.vercel.app/" target="_blank" rel="noopener" class="btn-primary" style="display:inline-flex;margin:0 auto;">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><polyline points="12 8 16 12 12 16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+        Open GrocerySync
+      </a>
+    </div>
+  </div>
+</section>
+
+<!-- Footer -->
+<footer>
+  <div class="footer-inner">
+    <span class="footer-copy" style="font-family:var(--mono);font-size:12px;">
+      © 2026 GrocerySync
+    </span>
+    <a href="https://grocery-tracker-khaki.vercel.app/" target="_blank" rel="noopener" class="footer-link" style="font-size:13px;">
+      grocery-tracker-khaki.vercel.app ↗
+    </a>
+  </div>
+</footer>
+
+<script>
+  // ── Scroll reveal ─────────────────────────────────────────────────────
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (!entry.isIntersecting) return;
+      const el = entry.target;
+      const delay = parseInt(el.dataset.delay || 0);
+      setTimeout(() => el.classList.add('visible'), delay);
+      observer.unobserve(el);
+    });
+  }, { threshold: 0.12 });
+
+  document.querySelectorAll('.feature-card, .step, .cta-card').forEach(el => observer.observe(el));
+
+  // ── Magnetic glow on feature cards ───────────────────────────────────
+  document.querySelectorAll('.feature-card').forEach(card => {
+    card.addEventListener('mousemove', e => {
+      const r = card.getBoundingClientRect();
+      const x = ((e.clientX - r.left) / r.width  * 100).toFixed(1);
+      const y = ((e.clientY - r.top)  / r.height * 100).toFixed(1);
+      card.style.setProperty('--mx', x + '%');
+      card.style.setProperty('--my', y + '%');
+    });
+  });
+
+  // ── Smooth scroll for anchor links ────────────────────────────────────
+  document.querySelectorAll('a[href^="#"]').forEach(a => {
+    a.addEventListener('click', e => {
+      e.preventDefault();
+      const target = document.querySelector(a.getAttribute('href'));
+      if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  });
+</script>
+</body>
+</html>
